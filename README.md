@@ -47,7 +47,7 @@ python experiments/scripts/run_paper2_endogenous_content.py --config experiments
 python experiments/scripts/run_paper2_coupling_sweep.py     --config experiments/configs/paper2_coupling_sweep.json     --out experiments/results/paper2/coupling_sweep
 python experiments/scripts/run_paper2_adaptive_delay.py     --config experiments/configs/paper2_adaptive_delay.json     --out experiments/results/paper2/adaptive_delay
 python experiments/scripts/run_paper2_joint_optimization.py --config experiments/configs/paper2_joint_optimization.json --out experiments/results/paper2/joint_optimization
-python experiments/scripts/run_paper2_bridge_contagion.py   --config experiments/configs/paper2_bridge_contagion.json   --out experiments/results/paper2/bridge_contagion
+python experiments/scripts/run_paper2_bridge_contagion.py   --out experiments/results/paper2/bridge_contagion   # built-in config (--seeds optional)
 
 # figures (read the tracked summary.csv files)
 python experiments/scripts/make_paper2_figures.py
