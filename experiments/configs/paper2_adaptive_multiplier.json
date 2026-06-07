@@ -1,0 +1,28 @@
+{
+  "steps": 500,
+  "n": 240,
+  "topology": "modular",
+  "num_communities": 6,
+  "p_in": 0.08,
+  "p_out": 0.004,
+  "bridge_fraction": 0.12,
+  "delay_steps": 6,
+  "k": 10.0,
+  "alarm_threshold": 0.72,
+  "influence_weight": 0.22,
+  "learning": true,
+  "regulator": "static",
+  "regulator_force": 1.0,
+  "enable_content": true,
+  "enable_noise": true,
+  "conditions": [
+    {"name": "static_m_1.0", "adaptive_multiplier": false, "bridge_multiplier": 1.0},
+    {"name": "static_m_1.35", "adaptive_multiplier": false, "bridge_multiplier": 1.35},
+    {"name": "static_m_1.8", "adaptive_multiplier": false, "bridge_multiplier": 1.8},
+    {"name": "adaptive_bandit", "adaptive_multiplier": true}
+  ],
+  "sweep": {
+    "noise_mode": ["oracle", "default", "fp_heavy", "fn_heavy"]
+  },
+  "seeds": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50]
+}

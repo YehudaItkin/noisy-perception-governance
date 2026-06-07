@@ -1,0 +1,24 @@
+{
+  "steps": 500,
+  "n": 240,
+  "topology": "modular",
+  "num_communities": 6,
+  "p_in": 0.08,
+  "p_out": 0.004,
+  "bridge_fraction": 0.12,
+  "delay_steps": 6,
+  "k": 10.0,
+  "alarm_threshold": 0.72,
+  "influence_weight": 0.22,
+  "learning": true,
+  "regulator": "static",
+  "regulator_force": 1.0,
+  "enable_content": true,
+  "enable_noise": true,
+  "noise_mode": "fp_heavy",
+  "sweep": {
+    "classifier_accuracy": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+    "bridge_multiplier": [1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
+  },
+  "seeds": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+}

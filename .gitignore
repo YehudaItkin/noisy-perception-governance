@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+# raw per-run outputs are large and regenerable; only summary.csv is tracked
+**/run_*_seed_*/
+experiments/results/**/history.csv
+experiments/results/**/config_resolved.json
