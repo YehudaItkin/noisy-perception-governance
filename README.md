@@ -1,11 +1,11 @@
 # Noisy-Perception Governance
 
-Code and data for **"Selective Control under Noisy Perception in Networked Multi-Agent Systems"**
-(the *governance loss* paper). A lightweight agent-based simulation in which a regulator governs a
+Code and data for **"Selective Control under Noisy Perception: Governance Failures Hidden by
+Aggregate Metrics in Modular Networks"** (the *governance loss* paper). A lightweight agent-based simulation in which a regulator governs a
 networked population through an imperfect classifier, plus the analysis that produces every figure and
 table in the paper.
 
-> **Status:** private during peer review; will be made public on publication.
+> **Status:** public, released with the arXiv preprint.
 > Companion paper (institutional delay without classification noise):
 > [`delayed-repression-instability`](https://github.com/YehudaItkin/delayed-repression-instability).
 
