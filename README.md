@@ -5,7 +5,7 @@ Aggregate Metrics in Modular Networks"** (the *governance loss* paper). A lightw
 networked population through an imperfect classifier, plus the analysis that produces every figure and
 table in the paper.
 
-> **Status:** public, released with the arXiv preprint.
+> **Status:** public. Preprint: [arXiv:2606.14819](https://arxiv.org/abs/2606.14819).
 > Companion paper (institutional delay without classification noise):
 > [`delayed-repression-instability`](https://github.com/YehudaItkin/delayed-repression-instability).
 
@@ -84,5 +84,19 @@ figures/                  # compiled paper figures (PDF)
 
 ## Citation
 
-If you use this code, please cite the paper (preprint/DOI to be added). MIT license to be added on
-public release.
+If you use this code, please cite the preprint:
+
+> Igor Itkin. *Selective Control under Noisy Perception: Governance Failures Hidden by Aggregate Metrics in Modular Networks.* arXiv:2606.14819, 2026. <https://arxiv.org/abs/2606.14819>
+
+```bibtex
+@misc{itkin2026selective,
+  title         = {Selective Control under Noisy Perception: Governance Failures Hidden by Aggregate Metrics in Modular Networks},
+  author        = {Itkin, Igor},
+  year          = {2026},
+  eprint        = {2606.14819},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.MA}
+}
+```
+
+Released under the MIT License (see [`LICENSE`](LICENSE)).
