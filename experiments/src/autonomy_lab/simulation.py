@@ -164,12 +164,21 @@ def build_graph(cfg, seed):
     # The overall D fraction (~0.20) is held fixed across placements.
     placement = cfg.get('content_placement', 'uniform')
     forced_ctype = {}
-    if cfg.get('enable_content', False) and placement in ('bridge_biased', 'nonbridge_biased'):
+    if cfg.get('enable_content', False) and placement in ('bridge_biased', 'nonbridge_biased', 'highdeg_nonbridge'):
         n_dangerous = int(round(0.20 * n))
         bridge_list = list(bridges)
         nonbridge_list = [i for i in range(n) if i not in bridges]
         random.shuffle(bridge_list); random.shuffle(nonbridge_list)
-        primary = bridge_list + nonbridge_list if placement == 'bridge_biased' else nonbridge_list + bridge_list
+        if placement == 'bridge_biased':
+            primary = bridge_list + nonbridge_list
+        elif placement == 'highdeg_nonbridge':
+            # Degree-matched control: high-degree but low-betweenness (non-bridge) nodes.
+            # Isolates whether the bridge effect is about betweenness or merely degree.
+            deg = dict(G.degree())
+            nonbridge_list.sort(key=lambda v: deg.get(v, 0), reverse=True)
+            primary = nonbridge_list + bridge_list
+        else:  # nonbridge_biased
+            primary = nonbridge_list + bridge_list
         d_nodes = set(primary[:n_dangerous])
         remaining = [i for i in range(n) if i not in d_nodes]
         random.shuffle(remaining)
@@ -187,16 +196,19 @@ def build_graph(cfg, seed):
             ctype = forced_ctype[i]
         else:
             ctype = random.choices(CONTENT, weights=[0.35,0.45,0.20])[0]
+        bb = bool(cfg.get('bridge_attr_bonus', True))  # off isolates pure position from charisma/detectability
         G.nodes[i].update({
             'action': random.choices(ACTIONS, weights=[0.80,0.17,0.03])[0],
-            'charisma': random.uniform(0.85,1.25) + (0.2 if is_bridge else 0.0),
+            'charisma': random.uniform(0.85,1.25) + (0.2 if (is_bridge and bb) else 0.0),
             'cost_scale': random.uniform(0.9,1.5),
-            'detectability': clip(random.uniform(0.45,1.0) + (0.15 if is_bridge else 0.0),0,1.0),
+            'detectability': clip(random.uniform(0.45,1.0) + (0.15 if (is_bridge and bb) else 0.0),0,1.0),
             'community': comm.get(i,0),
             'is_bridge': is_bridge,
             'content_type': ctype,
             'predicted_type': ctype,
             'punished_last_step': False,
+            'suppressed_steps': 0,
+            'immune': False,
             'agent': QAgent(
                 alpha=float(cfg.get('agent_alpha', 0.10)),
                 gamma=float(cfg.get('agent_gamma', 0.95)),
@@ -211,6 +223,54 @@ def build_graph(cfg, seed):
 
 def local_influence(G, i):
     return sum(G[j][i].get('weight',1.0) * state_value(G.nodes[j]['action']) for j in G.predecessors(i))
+
+def cross_community_productive(G, i, punished_flags):
+    """Coordination channel (Experiment 12, FP side). A productive node earns value
+    from productive partners in OTHER communities that are still live (not suppressed
+    this step). Suppressing a productive bridge removes it as a partner for all its
+    cross-community successors, so bridge false positives cost more than peripheral
+    ones. Returns 0 for non-productive nodes."""
+    if G.nodes[i].get('content_type') != 'P':
+        return 0.0
+    ci = G.nodes[i].get('community')
+    cnt = 0
+    for j in G.predecessors(i):
+        if (G.nodes[j].get('content_type') == 'P'
+                and G.nodes[j].get('community') != ci
+                and not punished_flags.get(j, False)
+                and G.nodes[j].get('suppressed_steps', 0) == 0):
+            cnt += 1
+    return float(cnt)
+
+def apply_cascade(G, cfg, punished_flags):
+    """Multi-hop dangerous-content contagion (Experiment 11, FN side). Detected danger
+    (predicted D and punished) is immunized and cleaned; susceptible nodes adopt D from
+    in-neighbors under a threshold rule. cascade_threshold theta spans the simple-vs-
+    complex contagion axis (Centola & Macy 2007): theta=0 -> a single dangerous neighbor
+    suffices (simple, crosses single bridge ties); larger theta requires a fraction theta
+    of neighbors (complex, blocked at single bridges). This is the only multi-hop process
+    in the model, so it is the only one through which betweenness can matter dynamically."""
+    beta = float(cfg.get('cascade_beta', 0.15))
+    theta = float(cfg.get('cascade_threshold', 0.0))
+    for i in G.nodes():
+        if punished_flags.get(i, False) and G.nodes[i].get('predicted_type') == 'D':
+            G.nodes[i]['immune'] = True
+            if G.nodes[i]['content_type'] == 'D':
+                G.nodes[i]['content_type'] = 'P'  # detected danger is removed
+    new_D = []
+    for i in G.nodes():
+        if G.nodes[i]['content_type'] == 'D' or G.nodes[i].get('immune', False):
+            continue
+        preds = list(G.predecessors(i))
+        if not preds:
+            continue
+        d_nbrs = sum(1 for j in preds if G.nodes[j]['content_type'] == 'D')
+        if d_nbrs == 0:
+            continue
+        if (d_nbrs / len(preds)) >= theta and random.random() < beta:
+            new_D.append(i)
+    for i in new_D:
+        G.nodes[i]['content_type'] = 'D'
 
 def global_alarm(G):
     return sum(G.nodes[i]['detectability']*state_value(G.nodes[i]['action']) for i in G.nodes()) / max(len(G),1)
@@ -369,11 +429,27 @@ def step(G, memory, cfg, rng, reg_agent=None, mult_bandit=None, content_transiti
     rewards, punished_flags, rep_probs = {}, {}, {}
     for i in G.nodes():
         p = repression_prob(G, i, delayed_alarm, cfg, force, bridge_mult_override=active_mult)
-        punished = random.random() < p
+        punished_flags[i] = random.random() < p
+        rep_probs[i] = p
+    coord_w = float(cfg.get('coordination_weight', 0.0)) if cfg.get('enable_coordination', False) else 0.0
+    for i in G.nodes():
         effective_cost_scale = G.nodes[i]['cost_scale'] * float(cfg.get('cost_scale_override', 1.0))
-        rewards[i] = benefit(G.nodes[i]['action'], G.nodes[i]['charisma'], G.nodes[i]['content_type']) + float(cfg.get('influence_weight',0.22))*local_influence(G,i)*state_value(G.nodes[i]['action']) - (punishment_cost(G.nodes[i]['action'], effective_cost_scale) if punished else 0.0)
-        punished_flags[i] = punished; rep_probs[i] = p
+        r = benefit(G.nodes[i]['action'], G.nodes[i]['charisma'], G.nodes[i]['content_type']) \
+            + float(cfg.get('influence_weight',0.22))*local_influence(G,i)*state_value(G.nodes[i]['action']) \
+            - (punishment_cost(G.nodes[i]['action'], effective_cost_scale) if punished_flags[i] else 0.0)
+        if coord_w > 0.0:
+            r += coord_w * cross_community_productive(G, i, punished_flags)
+        rewards[i] = r
     for i in G.nodes(): G.nodes[i]['punished_last_step'] = punished_flags[i]
+    dur = int(cfg.get('suppression_duration', 0))
+    if dur > 0:
+        for i in G.nodes():
+            if punished_flags[i]:
+                G.nodes[i]['suppressed_steps'] = dur
+            elif G.nodes[i].get('suppressed_steps', 0) > 0:
+                G.nodes[i]['suppressed_steps'] -= 1
+    if cfg.get('enable_cascade', False):
+        apply_cascade(G, cfg, punished_flags)
     current_alarm = global_alarm(G)
     memory.append(current_alarm)
     if len(memory) > int(cfg.get('delay_steps',6)) + 1:
@@ -407,6 +483,9 @@ def step(G, memory, cfg, rng, reg_agent=None, mult_bandit=None, content_transiti
         'content_frac_H': content_counts.get('H', 0) / n_nodes,
         'content_frac_P': content_counts.get('P', 0) / n_nodes,
         'content_frac_D': content_counts.get('D', 0) / n_nodes,
+        'coord_value': (sum(cross_community_productive(G, i, punished_flags) for i in G.nodes()) / n_nodes)
+                       if cfg.get('enable_coordination', False) else 0.0,
+        'd_communities': len({G.nodes[i]['community'] for i in G.nodes() if G.nodes[i]['content_type'] == 'D'}),
     }
 
 def run_simulation(cfg):
@@ -424,7 +503,8 @@ def run_simulation(cfg):
     history_keys = ['L','M','R','alarm_true','alarm_delayed','avg_repression','punished_fraction',
                     'usefulness','regulator_force','bridge_radical_fraction','dangerous_radical_bridge_fraction',
                     'false_positive_rate','false_negative_rate','false_positive_bridge_rate','false_negative_bridge_rate',
-                    'bridge_multiplier_used','content_frac_H','content_frac_P','content_frac_D']
+                    'bridge_multiplier_used','content_frac_H','content_frac_P','content_frac_D',
+                    'coord_value','d_communities']
     history = {k: [] for k in history_keys}
     for _ in range(int(cfg.get('steps',250))):
         fr = fractions(G)

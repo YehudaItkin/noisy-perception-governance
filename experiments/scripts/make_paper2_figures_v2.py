@@ -8,12 +8,15 @@ import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / 'results' / 'paper2_v2'
+# Canonical, deposited result tree (matches the paper text and the verifier).
+# All Paper-2 figures read from here so the deposit reproduces them exactly.
+CANON = ROOT / 'results' / 'paper2'
 FIGDIR = ROOT.parent / 'paper2' / 'latex' / 'figures'
 FIGDIR.mkdir(parents=True, exist_ok=True)
 
 
 def fig_noise_sweep():
-    summary = pd.read_csv(RESULTS / 'noise_sweep' / 'summary.csv')
+    summary = pd.read_csv(CANON / 'noise_sweep_50' / 'summary.csv')
     metrics = ['false_positive_rate_mean_tail', 'false_negative_rate_mean_tail',
                'false_positive_bridge_rate_mean_tail', 'false_negative_bridge_rate_mean_tail',
                'usefulness_mean_tail', 'punished_fraction_mean_tail']
@@ -38,7 +41,7 @@ def fig_noise_sweep():
 
 
 def fig_topology_bridge():
-    summary = pd.read_csv(RESULTS / 'topology_bridge' / 'summary.csv')
+    summary = pd.read_csv(CANON / 'topology_bridge_50' / 'summary.csv')
     fig, axes = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
     for idx, topo in enumerate(['er', 'modular', 'scale_free']):
         sub = summary[summary['topology'] == topo]
@@ -60,7 +63,12 @@ def fig_topology_bridge():
 
 
 def fig_governance_loss():
-    summary = pd.read_csv(RESULTS / 'governance_loss' / 'summary.csv')
+    # Decomposition must show the SAME L_gov reported in Table 1 / Experiment 1,
+    # i.e. the canonical noise sweep at the default targeting multiplier m=1.35,
+    # not the multiplier grid. The multiplier-robustness check stays in the prose,
+    # backed by governance_loss_50.
+    summary = pd.read_csv(CANON / 'noise_sweep_50' / 'summary.csv')
+    summary = summary[summary['bridge_multiplier'] == 1.35].copy()
     summary['L_fn'] = summary['false_negative_bridge_rate_mean_tail'] * summary['dangerous_radical_bridge_fraction_mean_tail']
     summary['L_fp'] = summary['false_positive_bridge_rate_mean_tail'] * summary['punished_fraction_mean_tail']
     summary['L_control'] = summary['avg_repression_mean_tail'] ** 2
